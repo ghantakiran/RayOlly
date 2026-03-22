@@ -1,0 +1,154 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rayolly.fullname" . }}-api
+  labels:
+    {{- include "rayolly.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      {{- include "rayolly.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        {{- include "rayolly.labels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/component
+                      operator: In
+                      values:
+                        - api
+                topologyKey: kubernetes.io/hostname
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: api
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: RAYOLLY_CLICKHOUSE_HOST
+              value: "{{ include "rayolly.fullname" . }}-clickhouse"
+            - name: RAYOLLY_CLICKHOUSE_PORT
+              value: "9000"
+            - name: RAYOLLY_CLICKHOUSE_HTTP_PORT
+              value: "8123"
+            - name: RAYOLLY_CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "rayolly.fullname" . }}-secrets
+                  key: clickhouse-password
+            - name: RAYOLLY_NATS_URL
+              value: "nats://{{ include "rayolly.fullname" . }}-nats:4222"
+            - name: RAYOLLY_NATS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "rayolly.fullname" . }}-secrets
+                  key: nats-auth-token
+            - name: RAYOLLY_REDIS_URL
+              value: "redis://{{ include "rayolly.fullname" . }}-redis:6379"
+            - name: RAYOLLY_POSTGRES_HOST
+              value: "{{ include "rayolly.fullname" . }}-postgres"
+            - name: RAYOLLY_POSTGRES_PORT
+              value: "5432"
+            - name: RAYOLLY_POSTGRES_USER
+              value: {{ .Values.postgres.user | quote }}
+            - name: RAYOLLY_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "rayolly.fullname" . }}-secrets
+                  key: postgres-password
+            - name: RAYOLLY_POSTGRES_DATABASE
+              value: {{ .Values.postgres.database | quote }}
+            - name: RAYOLLY_MINIO_ENDPOINT
+              value: "{{ include "rayolly.fullname" . }}-minio:9000"
+            - name: RAYOLLY_MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "rayolly.fullname" . }}-secrets
+                  key: minio-access-key
+            - name: RAYOLLY_MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "rayolly.fullname" . }}-secrets
+                  key: minio-secret-key
+            - name: RAYOLLY_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "rayolly.fullname" . }}-secrets
+                  key: jwt-secret
+            - name: RAYOLLY_API_KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "rayolly.fullname" . }}-secrets
+                  key: api-key-secret
+            - name: RAYOLLY_ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "rayolly.fullname" . }}-secrets
+                  key: anthropic-api-key
+            - name: RAYOLLY_AI_DEFAULT_MODEL
+              value: {{ .Values.ai.defaultModel | quote }}
+            - name: RAYOLLY_LOG_LEVEL
+              value: "info"
+            - name: RAYOLLY_SELF_MONITORING
+              value: {{ .Values.monitoring.selfMonitoring | quote }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

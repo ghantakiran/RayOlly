@@ -1,0 +1,61 @@
+===========================================================
+  RayOlly — AI-Native Observability Platform
+  Version: {{ .Chart.AppVersion }}
+===========================================================
+
+Thank you for installing {{ .Chart.Name }}!
+
+1. ACCESS THE DASHBOARD
+{{- if .Values.ingress.enabled }}
+   URL: http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.host }}
+{{- else }}
+   Run the following to port-forward the web dashboard:
+
+   kubectl port-forward svc/{{ include "rayolly.fullname" . }}-web {{ .Values.web.service.port }}:{{ .Values.web.service.port }}
+
+   Then open: http://localhost:{{ .Values.web.service.port }}
+{{- end }}
+
+2. ACCESS THE API
+{{- if .Values.ingress.enabled }}
+   API URL: http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.host }}/api
+{{- else }}
+   kubectl port-forward svc/{{ include "rayolly.fullname" . }}-api {{ .Values.api.service.port }}:{{ .Values.api.service.port }}
+
+   API URL: http://localhost:{{ .Values.api.service.port }}
+   Health:  http://localhost:{{ .Values.api.service.port }}/healthz
+{{- end }}
+
+3. SET THE ANTHROPIC API KEY (required for AI features)
+{{- if not .Values.ai.anthropicApiKey }}
+   WARNING: No Anthropic API key configured. AI features will be disabled.
+   Update the secret with your key:
+
+   kubectl create secret generic {{ include "rayolly.fullname" . }}-secrets \
+     --from-literal=anthropic-api-key=YOUR_KEY \
+     --dry-run=client -o yaml | kubectl apply -f -
+
+   Or upgrade the release:
+
+   helm upgrade {{ .Release.Name }} rayolly \
+     --set ai.anthropicApiKey=YOUR_KEY
+{{- else }}
+   Anthropic API key is configured.
+{{- end }}
+
+4. SEED DEMO DATA
+   Once the API is accessible, send sample telemetry:
+
+   curl -X POST http://localhost:{{ .Values.api.service.port }}/api/v1/logs/ingest \
+     -H "Content-Type: application/json" \
+     -d '{"entries":[{"timestamp":"{{ now | date "2006-01-02T15:04:05Z" }}","severity":"INFO","body":"Hello from RayOlly!","resource":{"service.name":"demo"}}]}'
+
+5. COMPONENT STATUS
+   kubectl get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+
+===========================================================
+  IMPORTANT: Change all default passwords before
+  deploying to production! Update values.yaml or use
+  --set flags for auth.jwtSecret, postgres.password,
+  clickhouse.password, nats.auth.token, minio.secretKey.
+===========================================================

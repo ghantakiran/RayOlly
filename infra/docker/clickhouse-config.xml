@@ -1,0 +1,97 @@
+<?xml version="1.0"?>
+<!--
+    RayOlly ClickHouse Server Configuration
+    Production-ready defaults tuned for observability workloads
+-->
+<clickhouse>
+    <!-- Network -->
+    <listen_host>0.0.0.0</listen_host>
+    <http_port>8123</http_port>
+    <tcp_port>9000</tcp_port>
+    <interserver_http_port>9009</interserver_http_port>
+
+    <!-- Resource Limits -->
+    <max_server_memory_usage_to_ram_ratio>0.8</max_server_memory_usage_to_ram_ratio>
+    <max_concurrent_queries>100</max_concurrent_queries>
+    <max_connections>256</max_connections>
+    <keep_alive_timeout>10</keep_alive_timeout>
+
+    <!-- Paths -->
+    <path>/var/lib/clickhouse/</path>
+    <tmp_path>/var/lib/clickhouse/tmp/</tmp_path>
+    <user_files_path>/var/lib/clickhouse/user_files/</user_files_path>
+    <format_schema_path>/var/lib/clickhouse/format_schemas/</format_schema_path>
+
+    <!-- Logging -->
+    <logger>
+        <level>information</level>
+        <log>/var/log/clickhouse-server/clickhouse-server.log</log>
+        <errorlog>/var/log/clickhouse-server/clickhouse-server.err.log</errorlog>
+        <size>100M</size>
+        <count>5</count>
+        <compress>true</compress>
+    </logger>
+
+    <!-- Query Logging -->
+    <query_log>
+        <database>system</database>
+        <table>query_log</table>
+        <partition_by>toYYYYMM(event_date)</partition_by>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </query_log>
+
+    <query_thread_log>
+        <database>system</database>
+        <table>query_thread_log</table>
+        <partition_by>toYYYYMM(event_date)</partition_by>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </query_thread_log>
+
+    <!-- Compression -->
+    <compression>
+        <case>
+            <min_part_size>10000000000</min_part_size>
+            <min_part_size_ratio>0.01</min_part_size_ratio>
+            <method>zstd</method>
+            <level>1</level>
+        </case>
+        <case>
+            <min_part_size>0</min_part_size>
+            <min_part_size_ratio>0</min_part_size_ratio>
+            <method>lz4</method>
+        </case>
+    </compression>
+
+    <!-- Merge Tree Settings -->
+    <merge_tree>
+        <max_suspicious_broken_parts>10</max_suspicious_broken_parts>
+        <parts_to_throw_insert>300</parts_to_throw_insert>
+        <parts_to_delay_insert>150</parts_to_delay_insert>
+        <max_delay_to_insert>1</max_delay_to_insert>
+        <max_parts_in_total>100000</max_parts_in_total>
+    </merge_tree>
+
+    <!-- Mark Cache (index) -->
+    <mark_cache_size>5368709120</mark_cache_size>
+
+    <!-- Uncompressed Cache -->
+    <uncompressed_cache_size>1073741824</uncompressed_cache_size>
+
+    <!-- Builtin Dictionaries -->
+    <builtin_dictionaries_reload_interval>3600</builtin_dictionaries_reload_interval>
+
+    <!-- Timezone -->
+    <timezone>UTC</timezone>
+
+    <!-- OpenTelemetry -->
+    <opentelemetry_span_log>
+        <engine>
+            engine MergeTree
+            partition by toYYYYMM(finish_date)
+            order by (finish_date, finish_time_us, trace_id)
+        </engine>
+        <database>system</database>
+        <table>opentelemetry_span_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </opentelemetry_span_log>
+</clickhouse>

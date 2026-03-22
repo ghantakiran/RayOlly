@@ -1,0 +1,203 @@
+## ------------------------------------------------------------------
+## RayOlly Helm Chart — default values
+## ------------------------------------------------------------------
+
+global:
+  namespace: rayolly
+  imagePullSecrets: []
+  domain: rayolly.local
+
+## ---- API Server ---------------------------------------------------
+api:
+  image:
+    repository: rayolly/api
+    tag: ""  # defaults to appVersion
+    pullPolicy: IfNotPresent
+  replicas: 2
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  env:
+    RAYOLLY_CLICKHOUSE_HOST: "{{ include \"rayolly.fullname\" . }}-clickhouse"
+    RAYOLLY_CLICKHOUSE_PORT: "9000"
+    RAYOLLY_NATS_URL: "nats://{{ include \"rayolly.fullname\" . }}-nats:4222"
+    RAYOLLY_REDIS_URL: "redis://{{ include \"rayolly.fullname\" . }}-redis:6379"
+    RAYOLLY_POSTGRES_HOST: "{{ include \"rayolly.fullname\" . }}-postgres"
+    RAYOLLY_POSTGRES_PORT: "5432"
+    RAYOLLY_MINIO_ENDPOINT: "{{ include \"rayolly.fullname\" . }}-minio:9000"
+    RAYOLLY_LOG_LEVEL: "info"
+  service:
+    type: ClusterIP
+    port: 8080
+  ingress:
+    path: /api
+    pathType: Prefix
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+## ---- Web Dashboard (Next.js) --------------------------------------
+web:
+  image:
+    repository: rayolly/web
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicas: 2
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  service:
+    type: ClusterIP
+    port: 3000
+  ingress:
+    path: /
+    pathType: Prefix
+
+## ---- ClickHouse ---------------------------------------------------
+clickhouse:
+  enabled: true
+  image:
+    repository: clickhouse/clickhouse-server
+    tag: "24.12"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  storage: 50Gi
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "8Gi"
+      cpu: "4000m"
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+  service:
+    httpPort: 8123
+    nativePort: 9000
+  password: "changeme-clickhouse"
+
+## ---- NATS with JetStream ------------------------------------------
+nats:
+  enabled: true
+  image:
+    repository: nats
+    tag: "2.10-alpine"
+    pullPolicy: IfNotPresent
+  replicas: 3
+  jetstream:
+    storage: 10Gi
+    storageClass: ""
+  auth:
+    token: "changeme-nats-token"
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+## ---- Redis --------------------------------------------------------
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+
+## ---- MinIO (S3-compatible cold storage) ---------------------------
+minio:
+  enabled: true
+  image:
+    repository: minio/minio
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  storage: 100Gi
+  storageClass: ""
+  accessKey: "rayolly-access-key"
+  secretKey: "changeme-minio-secret"
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+## ---- PostgreSQL ---------------------------------------------------
+postgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  storage: 10Gi
+  storageClass: ""
+  user: "rayolly"
+  password: "changeme-postgres"
+  database: "rayolly"
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+## ---- Auth & Secrets -----------------------------------------------
+auth:
+  jwtSecret: "changeme-jwt-secret-replace-in-production"
+  apiKeySecret: "changeme-api-key-secret"
+
+## ---- AI / LLM Integration ----------------------------------------
+ai:
+  anthropicApiKey: ""
+  defaultModel: "claude-sonnet-4-20250514"
+
+## ---- Ingress ------------------------------------------------------
+ingress:
+  enabled: false
+  className: nginx
+  host: rayolly.local
+  annotations: {}
+  tls:
+    enabled: false
+    secretName: rayolly-tls
+
+## ---- Monitoring ---------------------------------------------------
+monitoring:
+  selfMonitoring: true
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    namespace: ""
+
+## ---- Pod Disruption Budgets ---------------------------------------
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

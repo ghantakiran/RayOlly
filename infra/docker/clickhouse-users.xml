@@ -1,0 +1,116 @@
+<?xml version="1.0"?>
+<!--
+    RayOlly ClickHouse Users Configuration
+-->
+<clickhouse>
+    <!-- Profiles -->
+    <profiles>
+        <default>
+            <max_memory_usage>4000000000</max_memory_usage>
+            <max_execution_time>60</max_execution_time>
+            <max_rows_to_read>1000000000</max_rows_to_read>
+            <max_bytes_to_read>100000000000</max_bytes_to_read>
+            <use_uncompressed_cache>0</use_uncompressed_cache>
+            <load_balancing>random</load_balancing>
+            <log_queries>1</log_queries>
+        </default>
+
+        <readonly>
+            <max_memory_usage>2000000000</max_memory_usage>
+            <max_execution_time>30</max_execution_time>
+            <readonly>1</readonly>
+            <log_queries>1</log_queries>
+        </readonly>
+
+        <ingest>
+            <max_memory_usage>4000000000</max_memory_usage>
+            <max_execution_time>300</max_execution_time>
+            <max_insert_block_size>1048576</max_insert_block_size>
+            <max_partitions_per_insert_block>100</max_partitions_per_insert_block>
+            <async_insert>1</async_insert>
+            <wait_for_async_insert>0</wait_for_async_insert>
+            <async_insert_max_data_size>10000000</async_insert_max_data_size>
+            <async_insert_busy_timeout_ms>1000</async_insert_busy_timeout_ms>
+            <log_queries>0</log_queries>
+        </ingest>
+    </profiles>
+
+    <!-- Quotas -->
+    <quotas>
+        <default>
+            <interval>
+                <duration>3600</duration>
+                <queries>0</queries>
+                <errors>0</errors>
+                <result_rows>0</result_rows>
+                <read_rows>0</read_rows>
+                <execution_time>0</execution_time>
+            </interval>
+        </default>
+    </quotas>
+
+    <!-- Users -->
+    <users>
+        <default>
+            <password></password>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <profile>default</profile>
+            <quota>default</quota>
+            <access_management>0</access_management>
+        </default>
+
+        <rayolly>
+            <password>rayolly_dev</password>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <profile>default</profile>
+            <quota>default</quota>
+            <access_management>1</access_management>
+            <databases>
+                <logs />
+                <metrics />
+                <traces />
+                <events />
+                <system_audit />
+                <system />
+                <default />
+            </databases>
+        </rayolly>
+
+        <rayolly_ingest>
+            <password>rayolly_ingest_dev</password>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <profile>ingest</profile>
+            <quota>default</quota>
+            <access_management>0</access_management>
+            <databases>
+                <logs />
+                <metrics />
+                <traces />
+                <events />
+            </databases>
+        </rayolly_ingest>
+
+        <rayolly_reader>
+            <password>rayolly_reader_dev</password>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <profile>readonly</profile>
+            <quota>default</quota>
+            <access_management>0</access_management>
+            <databases>
+                <logs />
+                <metrics />
+                <traces />
+                <events />
+                <system />
+            </databases>
+        </rayolly_reader>
+    </users>
+</clickhouse>

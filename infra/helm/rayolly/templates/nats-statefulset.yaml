@@ -1,0 +1,100 @@
+{{- if .Values.nats.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "rayolly.fullname" . }}-nats
+  labels:
+    {{- include "rayolly.labels" . | nindent 4 }}
+    app.kubernetes.io/component: nats
+spec:
+  serviceName: {{ include "rayolly.fullname" . }}-nats
+  replicas: {{ .Values.nats.replicas }}
+  selector:
+    matchLabels:
+      {{- include "rayolly.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: nats
+  template:
+    metadata:
+      labels:
+        {{- include "rayolly.labels" . | nindent 8 }}
+        app.kubernetes.io/component: nats
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: nats
+          image: "{{ .Values.nats.image.repository }}:{{ .Values.nats.image.tag }}"
+          imagePullPolicy: {{ .Values.nats.image.pullPolicy }}
+          command:
+            - nats-server
+            - -c
+            - /etc/nats/nats.conf
+          ports:
+            - name: client
+              containerPort: 4222
+              protocol: TCP
+            - name: cluster
+              containerPort: 6222
+              protocol: TCP
+            - name: monitor
+              containerPort: 8222
+              protocol: TCP
+          env:
+            - name: NATS_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "rayolly.fullname" . }}-secrets
+                  key: nats-auth-token
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: monitor
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz?js-enabled-only=true
+              port: monitor
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.nats.resources | nindent 12 }}
+          volumeMounts:
+            - name: jetstream-data
+              mountPath: /data/jetstream
+            - name: nats-config
+              mountPath: /etc/nats
+      volumes:
+        - name: nats-config
+          configMap:
+            name: {{ include "rayolly.fullname" . }}-config
+            items:
+              - key: nats.conf
+                path: nats.conf
+  volumeClaimTemplates:
+    - metadata:
+        name: jetstream-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        {{- if .Values.nats.jetstream.storageClass }}
+        storageClassName: {{ .Values.nats.jetstream.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.nats.jetstream.storage }}
+{{- end }}

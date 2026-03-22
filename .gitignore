@@ -1,0 +1,92 @@
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+.venv/
+venv/
+env/
+.python-version
+pip-log.txt
+pip-delete-this-directory.txt
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+
+# ── Node.js ──────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+.nuxt/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+.turbo/
+
+# ── Environment & Secrets ────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+*.p12
+secrets/
+credentials.json
+
+# ── Docker ───────────────────────────────────────────────────
+docker-compose.override.yml
+.docker/
+
+# ── IDE ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.iml
+
+# ── OS ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── Data & Volumes (local dev) ───────────────────────────────
+data/
+tmp/
+*.db
+*.sqlite3
+*.log
+
+# ── Terraform ────────────────────────────────────────────────
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
+# ── Claude Code (local settings) ────────────────────────────
+.claude/
+
+# ── Misc ─────────────────────────────────────────────────────
+*.bak
+*.tmp
+*.orig
+.cache/

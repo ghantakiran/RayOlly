@@ -1,0 +1,74 @@
+repos:
+  # Python linting & formatting
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi]
+      - id: ruff-format
+        types_or: [python, pyi]
+
+  # Python type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        pass_filenames: false
+        args: [--config-file=backend/pyproject.toml, backend/rayolly/]
+        additional_dependencies:
+          - pydantic>=2.10.0
+          - pydantic-settings>=2.6.0
+          - fastapi>=0.115.0
+          - structlog>=24.4.0
+
+  # General file hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: detect-private-key
+      - id: no-commit-to-branch
+        args: [--branch, main, --branch, production]
+
+  # Security scanning
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: \.env\.example$
+
+  # SQL linting
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 3.3.0
+    hooks:
+      - id: sqlfluff-lint
+        args: [--dialect, clickhouse]
+        files: \.sql$
+
+  # Frontend
+  - repo: local
+    hooks:
+      - id: frontend-lint
+        name: Frontend ESLint
+        entry: bash -c 'cd frontend && npx next lint --quiet'
+        language: system
+        files: \.(ts|tsx)$
+        pass_filenames: false
+
+      - id: frontend-typecheck
+        name: Frontend TypeScript
+        entry: bash -c 'cd frontend && npx tsc --noEmit'
+        language: system
+        files: \.(ts|tsx)$
+        pass_filenames: false

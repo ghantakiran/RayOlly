@@ -1,0 +1,170 @@
+version: "3.9"
+
+services:
+  # ── Core API ────────────────────────────────────────────────
+  rayolly-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      RAYOLLY_ENV: development
+      RAYOLLY_LOG_LEVEL: debug
+      RAYOLLY_CLICKHOUSE_HOST: clickhouse
+      RAYOLLY_CLICKHOUSE_PORT: "9000"
+      RAYOLLY_CLICKHOUSE_HTTP_PORT: "8123"
+      RAYOLLY_CLICKHOUSE_USER: rayolly
+      RAYOLLY_CLICKHOUSE_PASSWORD: rayolly_dev
+      RAYOLLY_CLICKHOUSE_DATABASE: default
+      RAYOLLY_NATS_URL: nats://nats:4222
+      RAYOLLY_NATS_TOKEN: rayolly_dev_token
+      RAYOLLY_REDIS_URL: redis://redis:6379/0
+      RAYOLLY_MINIO_ENDPOINT: minio:9000
+      RAYOLLY_MINIO_ACCESS_KEY: minioadmin
+      RAYOLLY_MINIO_SECRET_KEY: minioadmin
+      RAYOLLY_MINIO_USE_SSL: "false"
+      RAYOLLY_POSTGRES_DSN: postgresql://rayolly:rayolly_dev@postgres:5432/rayolly
+      RAYOLLY_API_HOST: 0.0.0.0
+      RAYOLLY_API_PORT: "8080"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    networks:
+      - rayolly-net
+    restart: unless-stopped
+
+  # ── ClickHouse (OLAP storage) ──────────────────────────────
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.12
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./backend/migrations/clickhouse:/docker-entrypoint-initdb.d
+      - ./infra/docker/clickhouse-config.xml:/etc/clickhouse-server/config.d/custom.xml
+      - ./infra/docker/clickhouse-users.xml:/etc/clickhouse-server/users.d/custom.xml
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: rayolly
+      CLICKHOUSE_PASSWORD: rayolly_dev
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - rayolly-net
+    restart: unless-stopped
+
+  # ── NATS (message bus) ─────────────────────────────────────
+  nats:
+    image: nats:2.10-alpine
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: >
+      -js
+      -sd /data
+      -m 8222
+      --auth rayolly_dev_token
+    volumes:
+      - nats_data:/data
+    networks:
+      - rayolly-net
+    restart: unless-stopped
+
+  # ── Redis (cache + ephemeral state) ────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - rayolly-net
+    restart: unless-stopped
+
+  # ── MinIO (object storage / S3-compatible) ─────────────────
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9002:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    networks:
+      - rayolly-net
+    restart: unless-stopped
+
+  # ── PostgreSQL (metadata / control plane) ──────────────────
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: rayolly
+      POSTGRES_USER: rayolly
+      POSTGRES_PASSWORD: rayolly_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rayolly -d rayolly"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rayolly-net
+    restart: unless-stopped
+
+  # ── Frontend ───────────────────────────────────────────────
+  rayolly-web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      NODE_ENV: development
+    depends_on:
+      - rayolly-api
+    networks:
+      - rayolly-net
+    restart: unless-stopped
+
+volumes:
+  clickhouse_data:
+  nats_data:
+  redis_data:
+  minio_data:
+  postgres_data:
+
+networks:
+  rayolly-net:
+    driver: bridge
